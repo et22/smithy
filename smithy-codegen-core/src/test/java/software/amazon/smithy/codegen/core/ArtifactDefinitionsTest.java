@@ -5,7 +5,11 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.net.URI;
 import java.net.URISyntaxException;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -53,7 +57,7 @@ class ArtifactDefinitionsTest {
 
     @Test
     void assertsFromDefinitionsFileWorksWithRequiredFields() throws URISyntaxException, FileNotFoundException {
-        ArtifactDefinitions artifactDefinitions = ArtifactDefinitions.createFromFile(getClass().getResource("definitions.json").toURI());
+        ArtifactDefinitions artifactDefinitions = createFromFileHelper(getClass().getResource("definitions.json").toURI());
 
         ArtifactDefinitions artifactDefinitions2 = ArtifactDefinitions.builder()
                 .addType("t1", "t1val")
@@ -84,6 +88,11 @@ class ArtifactDefinitionsTest {
                     .addType("t2", "t2val")
                     .build();
         });
+    }
+
+    ArtifactDefinitions createFromFileHelper(URI filename) throws FileNotFoundException {
+        InputStream stream = new FileInputStream(new File(filename));
+        return ArtifactDefinitions.createFromNode(Node.parse(stream).expectObjectNode());
     }
 
 }
