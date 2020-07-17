@@ -185,7 +185,11 @@ public final class TraceFile implements ToNode, ToSmithyBuilder<TraceFile> {
      * Gets this TraceFile's smithyTrace.
      * The smithyTrace {@link String} contains the Smithy trace file version number.
      *
+<<<<<<< Updated upstream
      * @return a String representing trace file ID.
+=======
+     * @return a String representing trace file ID, or null if ID has not been set.
+>>>>>>> Stashed changes
      */
     public String getSmithyTrace() {
         return smithyTrace;

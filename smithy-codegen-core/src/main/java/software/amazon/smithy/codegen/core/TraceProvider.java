@@ -15,14 +15,28 @@
 
 package software.amazon.smithy.codegen.core;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
+
+import software.amazon.smithy.build.FileManifest;
+import software.amazon.smithy.build.MockManifest;
+import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.AbstractTrait;
 import software.amazon.smithy.model.traits.EnumTrait;
 
 public class TraceProvider extends SymbolProviderDecorator {
 
-    protected TraceFile.TraceFileBuilder traceFileBuilder;
+    protected TraceFile.Builder traceFileBuilder;
 
     private boolean isMetadataFilled = false;
     private boolean isDefinitionsFilled = false;
@@ -34,32 +48,50 @@ public class TraceProvider extends SymbolProviderDecorator {
      */
     public TraceProvider(SymbolProvider provider) {
         super(provider);
-        traceFileBuilder = new TraceFile.TraceFileBuilder();
+        traceFileBuilder = TraceFile.builder();
     }
 
     @Override
     public Symbol toSymbol(Shape shape) {
         Symbol symbol = provider.toSymbol(shape);
-        //symbol = symbol.toBuilder().putProperty( addSymbolToShapes(symbol));
-        addSymbolToShapes(symbol);
 
-        //if metadata hasn't been filled yet
-        if (!isMetadataFilled) {
-            fillArtifactMetadata(symbol);
-            isMetadataFilled = true;
+        if(!shape.getId().getNamespace().equals("smithy.api")) {
+
+            addSymbolToShapes(symbol);
+
+            //if metadata hasn't been filled yet
+            if (!isMetadataFilled) {
+                fillArtifactMetadata(symbol);
+                isMetadataFilled = true;
+            }
+
+            //if our symbol has definitions defined
+            if (!isDefinitionsFilled && symbol.getProperty(TraceFile.DEFINITIONS_TEXT).isPresent()) {
+                traceFileBuilder.definitions(symbol.expectProperty(TraceFile.DEFINITIONS_TEXT, ArtifactDefinitions.class));
+                isDefinitionsFilled = true;
+            }
+
+            try {
+                buildAndWriteTraceFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
-
-        //if our symbol has definitions defined
-        if(!isDefinitionsFilled && symbol.getProperty(TraceFile.DEFINITIONS_TEXT).isPresent()){
-            traceFileBuilder.setDefinitions(symbol.expectProperty(TraceFile.DEFINITIONS_TEXT,Definitions.class));
-            isDefinitionsFilled = true;
-        }
-
         return symbol;
     }
 
     public TraceFile getTraceFile() {
         return traceFileBuilder.build();
+    }
+
+    private void buildAndWriteTraceFile() throws IOException {
+        TraceFile traceFile = traceFileBuilder.build();
+        File file = new File("tracefile" + traceFile.getArtifactMetadata().getTimestamp());
+        file.createNewFile();
+        Writer writer = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8);
+        PrintWriter pw = new PrintWriter(writer);
+        pw.print(Node.prettyPrintJson(traceFile.toNode(), "  "));
+        pw.close();
     }
     /**
      * Fills ArtifactMetadata with a type and timestamp based on symbol, and a temporary UUID for version and
@@ -70,8 +102,12 @@ public class TraceProvider extends SymbolProviderDecorator {
     protected void fillArtifactMetadata(Symbol symbol) {
         //temporarily set id and version a UUID, this should be changed later once the version is known
         String tempIdVersion = UUID.randomUUID().toString();
-        traceFileBuilder.setArtifactMetadata(new ArtifactMetadata.ArtifactMetadataBuilder(tempIdVersion,tempIdVersion,
-                getTypeFromSymbol(symbol)).setTimestampAsNow().build());
+        traceFileBuilder.artifact(ArtifactMetadata.builder()
+                        .version(tempIdVersion)
+                        .id(tempIdVersion)
+                        .type(getTypeFromSymbol(symbol))
+                        .setTimestampAsNow()
+                        .build());
     }
 
     /**
@@ -121,8 +157,11 @@ public class TraceProvider extends SymbolProviderDecorator {
         ShapeId shapeId = symbol.expectProperty("shape", Shape.class).getId();
 
         //set ShapeLink's file
-        ShapeLink link = new ShapeLink.ShapeLinkBuilder(getShapeTypeFromSymbol(symbol), getIdFromSymbol(symbol))
-                .setFile(symbol.getDefinitionFile()).build();
+        ShapeLink link = ShapeLink.builder()
+                .type(getShapeTypeFromSymbol(symbol))
+                .id(getIdFromSymbol(symbol))
+                .file(symbol.getDefinitionFile())
+                .build();
 
         traceFileBuilder.addShapeLink(shapeId, link);
     }
@@ -135,7 +174,9 @@ public class TraceProvider extends SymbolProviderDecorator {
      * @return String that contains the extracted id.
      */
     protected String getIdFromSymbol(Symbol symbol) {
-        return symbol.toString().replace(".", "").replace(symbol.getNamespaceDelimiter(), ".");
+        return symbol.toString()
+                .replace(".", "")
+                .replace(symbol.getNamespaceDelimiter(), ".");
     }
 
     /**

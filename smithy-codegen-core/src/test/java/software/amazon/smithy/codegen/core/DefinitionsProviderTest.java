@@ -2,6 +2,7 @@ package software.amazon.smithy.codegen.core;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.Shape;
 
 import java.io.IOException;
@@ -13,6 +14,7 @@ class DefinitionsProviderTest {
     @Test
     void toSymbol() throws IOException, URISyntaxException {
         TraceProvider traceProvider = new TraceProvider(new DefinitionsProvider(new SymbolProviderTestHelper()));
+
         Model model = Model.assembler()
                 .addImport(getClass().getResource("weather-service.smithy"))
                 .assemble()
@@ -20,25 +22,25 @@ class DefinitionsProviderTest {
         for (Shape shape : model.toSet()) {
             traceProvider.toSymbol(shape);
         }
+
         //verifying that it can be written and parsed without exceptions
-        traceProvider.getTraceFile().writeTraceFile(getClass().getResource("trace_file_output.txt").getFile());
-        TraceFile traceFile = new TraceFile();
-        traceFile.parseTraceFile(getClass().getResource("trace_file_output.txt").toURI());
+        Node node = traceProvider.getTraceFile().toNode();
+        TraceFile traceFile = TraceFile.createFromNode((node));
 
-        assert traceFile.getDefinitions().get().getTypes().containsKey("t1");
+        assert traceFile.getArtifactDefinitions().get().getTypes().containsKey("t1");
 
-        assert traceFile.getDefinitions().get().getTypes().containsValue("t1val");
+        assert traceFile.getArtifactDefinitions().get().getTypes().containsValue("t1val");
 
-        assert traceFile.getDefinitions().get().getTypes().containsKey("t2");
+        assert traceFile.getArtifactDefinitions().get().getTypes().containsKey("t2");
 
-        assert traceFile.getDefinitions().get().getTypes().containsValue("t2val");
+        assert traceFile.getArtifactDefinitions().get().getTypes().containsValue("t2val");
 
-        assert traceFile.getDefinitions().get().getTags().containsKey("tag2");
+        assert traceFile.getArtifactDefinitions().get().getTags().containsKey("tag2");
 
-        assert traceFile.getDefinitions().get().getTags().containsValue("tag2val");
+        assert traceFile.getArtifactDefinitions().get().getTags().containsValue("tag2val");
 
-        assert traceFile.getDefinitions().get().getTags().containsKey("tag1");
+        assert traceFile.getArtifactDefinitions().get().getTags().containsKey("tag1");
 
-        assert traceFile.getDefinitions().get().getTags().containsValue("tag1val");
+        assert traceFile.getArtifactDefinitions().get().getTags().containsValue("tag1val");
     }
 }

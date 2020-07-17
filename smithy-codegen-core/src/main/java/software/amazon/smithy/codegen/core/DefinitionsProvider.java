@@ -16,17 +16,19 @@
 package software.amazon.smithy.codegen.core;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Objects;
 
+import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.Shape;
 
 public class DefinitionsProvider extends SymbolProviderDecorator {
     public static final String DEFINITIONS_FILE_NAME = "definitions.txt";
-    protected Definitions definitions = new Definitions();
-    private boolean isDefinitionsFilled = false;
+    protected ArtifactDefinitions definitions;
+    private boolean isArtifactDefinitionsFilled = false;
 
     /**
      * Constructor for {@link SymbolProviderDecorator}.
@@ -63,9 +65,14 @@ public class DefinitionsProvider extends SymbolProviderDecorator {
     @Override
     public Symbol toSymbol(Shape shape) {
         Symbol symbol = provider.toSymbol(shape);
-        if (!isDefinitionsFilled) {
+        if (!isArtifactDefinitionsFilled) {
             try {
-                definitions.fromNode(definitions.fromDefinitionsFile(this.getClass().getResource(DEFINITIONS_FILE_NAME).toURI()));
+                definitions = ArtifactDefinitions.createFromNode(
+                        Node.parse(
+                                new FileInputStream(
+                                        new File(
+                                                this.getClass().getResource(DEFINITIONS_FILE_NAME).toURI()
+                ))));
                 symbol = symbol.toBuilder().putProperty(TraceFile.DEFINITIONS_TEXT, definitions).build();
             } catch (URISyntaxException | FileNotFoundException e) {
                 e.printStackTrace();
